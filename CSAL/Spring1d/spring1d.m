@@ -31,7 +31,7 @@
 %               (nnd x 1) [m]
 %
 % AUTHOR:
-%   Seung-Hoon Kang (seunghoon.kang94@gmail.com)
+%   Seung-Hoon Kang
 %
 % LAST MODIFIED:
 %   2025-08-10
@@ -205,5 +205,6 @@ set(gca, 'Fontsize', 16)
 xlabel('X [m]')
 ylabel('Y [m]')
 colorbar
+
 
 fprintf('Done displaying.\n')
