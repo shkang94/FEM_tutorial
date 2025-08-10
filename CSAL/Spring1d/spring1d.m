@@ -33,9 +33,6 @@
 % AUTHOR:
 %   Seung-Hoon Kang
 %
-% LAST MODIFIED:
-%   2025-08-10
-%
 %--------------------------------------------------------------------------
 
 clear all; close all; clc
@@ -208,3 +205,4 @@ colorbar
 
 
 fprintf('Done displaying.\n')
+
