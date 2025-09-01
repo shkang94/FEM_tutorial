@@ -51,7 +51,7 @@ coord        = [];                              % Nodal coordinates [m]
 ELEMENT      = struct('con', {}, 'PROPid', {}); % Element data
 PROP         = struct('spcoef', {});            % Property data
 FORCE_NODE   = struct('NODEid', {}, 'val', {}); % Nodal Force data
-BC_PRECRIBED = struct('NODEid', {}, 'val', {}); % Prescribed boundary 
+BC_PRESCRIBED = struct('NODEid', {}, 'val', {}); % Prescribed boundary 
                                                 % condition data
 current_section = ''; % To track which part of the file we are in
 
@@ -106,8 +106,8 @@ while 1
             FORCE_NODE(end).val = force_scan(2); % Value
         case 'BC_PRESCRIBED' % Scan prescribed boundary condition data
             bc_scan = sscanf(line, '%f')';
-            BC_PRECRIBED(end+1).NODEid = round(bc_scan(1)); % NODE ID
-            BC_PRECRIBED(end).val = bc_scan(2); % Value    
+            BC_PRESCRIBED(end+1).NODEid = round(bc_scan(1)); % NODE ID
+            BC_PRESCRIBED(end).val = bc_scan(2); % Value    
     end
 end
 
@@ -133,9 +133,9 @@ end
 
 u = zeros(nnd,1); % Global displacement vector
 bcdof = []; % ID set of constrained DOFs
-for i = 1:length(BC_PRECRIBED)
-    NODEid = BC_PRECRIBED(i).NODEid;
-    val = BC_PRECRIBED(i).val;
+for i = 1:length(BC_PRESCRIBED)
+    NODEid = BC_PRESCRIBED(i).NODEid;
+    val = BC_PRESCRIBED(i).val;
     u(NODEid) = val; % Assign value of prescribed boundary condition 
     bcdof(end+1) = NODEid; % Append DOF ID.
 end
@@ -205,4 +205,5 @@ colorbar
 
 
 fprintf('Done displaying.\n')
+
 
