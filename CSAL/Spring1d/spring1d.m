@@ -47,10 +47,10 @@ ndim   = 1; % Number of spatial dimensions
 fprintf('Scanning the input file ...\n')
 
 % 1-1. Initialize variables
-coord        = [];                              % Nodal coordinates [m]
-ELEMENT      = struct('con', {}, 'PROPid', {}); % Element data
-PROP         = struct('spcoef', {});            % Property data
-FORCE_NODE   = struct('NODEid', {}, 'val', {}); % Nodal Force data
+coord         = [];                              % Nodal coordinates [m]
+ELEMENT       = struct('con', {}, 'PROPid', {}); % Element data
+PROP          = struct('spcoef', {});            % Property data
+FORCE_NODE    = struct('NODEid', {}, 'val', {}); % Nodal Force data
 BC_PRESCRIBED = struct('NODEid', {}, 'val', {}); % Prescribed boundary 
                                                 % condition data
 current_section = ''; % To track which part of the file we are in
@@ -205,5 +205,6 @@ colorbar
 
 
 fprintf('Done displaying.\n')
+
 
 
