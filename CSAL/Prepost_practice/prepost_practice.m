@@ -95,7 +95,7 @@ nel = size(con,1);   % Number of elements
 % 1-5. Display the input data (finite element mesh)
 fprintf('Done input scan.\n');
 fprintf('- Number of nodes: %d\n', nnd)
-fprintf('- Number of Elements: %d\n', nel)
+fprintf('- Number of elements: %d\n', nel)
 
 %% 2. Numerical Solver
 % Load pre-computed solver results.
@@ -154,4 +154,5 @@ colorbar
 
 
 fprintf('Done displaying.\n')
+
 
