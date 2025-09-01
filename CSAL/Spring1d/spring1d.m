@@ -52,7 +52,7 @@ ELEMENT       = struct('con', {}, 'PROPid', {}); % Element data
 PROP          = struct('spcoef', {});            % Property data
 FORCE_NODE    = struct('NODEid', {}, 'val', {}); % Nodal Force data
 BC_PRESCRIBED = struct('NODEid', {}, 'val', {}); % Prescribed boundary 
-                                                % condition data
+                                                 % condition data
 current_section = ''; % To track which part of the file we are in
 
 % 1-2. Open the file
@@ -205,6 +205,7 @@ colorbar
 
 
 fprintf('Done displaying.\n')
+
 
 
 
