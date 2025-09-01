@@ -35,9 +35,6 @@
 % AUTHOR:
 %   Seung-Hoon Kang (seunghoon.kang94@gmail.com)
 %
-% LAST MODIFIED:
-%   2025-09-02
-%
 %--------------------------------------------------------------------------
 
 clear all; close all; clc
@@ -229,5 +226,6 @@ set(gca, 'Fontsize', 16)
 xlabel('X [m]')
 ylabel('Y [m]')
 colorbar
+
 
 fprintf('Done displaying.\n')
