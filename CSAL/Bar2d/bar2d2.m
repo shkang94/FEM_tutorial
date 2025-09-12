@@ -36,7 +36,7 @@
 %               (nnd x 2) [m]
 %
 % AUTHOR:
-%   Seung-Hoon Kang (seunghoon.kang94@gmail.com)
+%   Seung-Hoon Kang
 %
 %--------------------------------------------------------------------------
 
@@ -346,5 +346,6 @@ xlabel('X [m]')
 ylabel('Y [m]')
 colorbar
 colormap jet
+
 
 fprintf('Done displaying.\n')
