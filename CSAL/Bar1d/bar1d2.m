@@ -33,7 +33,7 @@
 %               (nnd x 1) [m]
 %
 % AUTHOR:
-%   Seung-Hoon Kang (seunghoon.kang94@gmail.com)
+%   Seung-Hoon Kang
 %
 %--------------------------------------------------------------------------
 
@@ -229,4 +229,5 @@ colorbar
 
 
 fprintf('Done displaying.\n')
+
 
