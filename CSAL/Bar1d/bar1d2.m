@@ -147,7 +147,7 @@ for i = 1:length(FORCE_LINE)
     cone = FORCE_LINE(i).con;
     val = FORCE_LINE(i).val;
     lvec = coord(cone(2))-coord(cone(1)); % Line vector
-    f(cone) = f(cone) + val*lvec; % Add line force
+    f(cone) = f(cone) + 0.5*val*lvec; % Add line force
 end
 
 u = zeros(nnd,1); % Global displacement vector
@@ -229,3 +229,4 @@ colorbar
 
 
 fprintf('Done displaying.\n')
+
