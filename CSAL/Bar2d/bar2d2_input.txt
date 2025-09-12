@@ -1,0 +1,37 @@
+*NODE
+% xcoord  ycoord
+     0.0     0.0
+     1.0     0.0
+     2.0     0.0
+     0.0     1.0
+     1.0     1.0
+     2.0     1.0
+	 
+*ELEMENT
+%NODEid1 NODEid2  PROPid
+       1       2       1
+       2       3       1
+       1       4       1
+	   2       4       1
+       2       5       1
+       3       5       1
+	   3       6       1
+       4       5       1
+       5       6       1
+
+*PROP
+%      E       A
+   1.0e6    0.01
+
+*FORCE_NODE
+% NODEid    xval    yval
+       4     0.0    -4.0
+
+*BC_PRESCRIBED
+% NODEid     val    type 
+%                (1: ux, 2: uy)
+       1     0.0       1
+	   3     0.0       2
+	   4     0.0       1
+
+*EOF
