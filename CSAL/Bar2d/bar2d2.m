@@ -328,15 +328,8 @@ colorbar
 colormap jet
 
 % 3-4. Display the total displacement on the deformed configuration
-coord_def_xsym = coord_def;
-coord_def_xsym(:,1) = -coord_def(:,1);
-
 figure(4)
 patch('Faces', con, 'Vertices', coord_def, 'LineWidth', 3, ...
-    'FaceVertexCData', sqrt(ux.^2+uy.^2), 'Edgecolor', 'interp', ...
-    'Marker', 'o', 'MarkerSize', 10);
-hold on
-patch('Faces', con, 'Vertices', coord_def_xsym, 'LineWidth', 3, ...
     'FaceVertexCData', sqrt(ux.^2+uy.^2), 'Edgecolor', 'interp', ...
     'Marker', 'o', 'MarkerSize', 10);
 set(gca,'DataAspectRatio',[1 1 1])
@@ -349,3 +342,4 @@ colormap jet
 
 
 fprintf('Done displaying.\n')
+
