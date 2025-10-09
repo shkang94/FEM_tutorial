@@ -1,5 +1,5 @@
 %--------------------------------------------------------------------------
-%                FEM 2D 2-Node Beam Element Practice Script
+%                FEM 1D 2-Node Beam Element Practice Script
 %--------------------------------------------------------------------------
 % PURPOSE:
 %   To practice the 1D 2-node beam finite element.
@@ -302,7 +302,7 @@ ylabel('Y [m]')
 
 % 3-2. Display the Y-displacement on the deformed configuration
 %   coord_def: Nodal coordinates of the deformed configuration [m]
-coord_def = zeros(nnd, ndim);
+coord_def = zeros(nnd, 2);
 coord_def(:,1) = coord;              % x <- x0
 coord_def(:,2) = coordy + uscale*uy; % y <- x0+uy
 
@@ -359,3 +359,4 @@ ylabel('Shear force [N]')
 
 
 fprintf('Done displaying.\n')
+
