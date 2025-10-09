@@ -1,5 +1,5 @@
 %--------------------------------------------------------------------------
-%                FEM 2D 2-Node Bar Element Practice Script
+%                FEM 2D 2-Node Beam Element Practice Script
 %--------------------------------------------------------------------------
 % PURPOSE:
 %   To practice the 1D 2-node beam finite element.
@@ -18,7 +18,7 @@
 %   ndpe      : Number of DOFs per element
 %   nnpl      : Number of nodes per line
 %   ndim      : Number of spatial dimensions (e.g., 1 for 1D)
-%   coord     : Nodal coordinates (nnd x 2) [m]
+%   coord     : Nodal coordinates (nnd x 1) [m]
 %   nnd       : Number of nodes
 %   nel       : Number of elements
 %   ndof      : Number of DOFs
@@ -192,7 +192,7 @@ for iel = 1:nel % Loop for each element
     PROPid = ELEMENT(iel).PROPid; % PROP ID of current element
 
     E = PROP(PROPid).E; % Elastic modulus of current element;
-    I = PROP(PROPid).I; % 2nd moment area of current element;
+    I = PROP(PROPid).I; % 2nd moment of area of current element;
 
     lvec = coorde(2,:)-coorde(1,:); % Line vector
     L = norm(lvec); % Length of current element;
@@ -356,5 +356,6 @@ title('Shear force diagram')
 set(gca, 'Fontsize', 16)
 xlabel('X [m]')
 ylabel('Shear force [N]')
+
 
 fprintf('Done displaying.\n')
