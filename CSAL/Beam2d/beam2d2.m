@@ -22,13 +22,13 @@
 %   nnd       : Number of nodes
 %   nel       : Number of elements
 %   ndof      : Number of DOFs
-%   f         : Global force vector (nnd x 1) [N]
-%   u         : Global displacement vector (ndof x 1) [m]
-%   K         : Global stiffness matrix (ndof x ndof) [N/m]
-%   Ke        : Elemental stiffness matrix (ndpe x ndpe) [N/m]
-%   fr        : Reduced nodal force vector (nfreedof x 1) [N]
-%   ur        : Reduced displacement vector (nfreedof x 1) [m]
-%   Kr        : Reduced stiffness matrix (nfreedof x nfreedof) [N/m]
+%   f         : Global force vector (ndof x 1)
+%   u         : Global displacement vector (ndof x 1)
+%   K         : Global stiffness matrix (ndof x ndof)
+%   Ke        : Elemental stiffness matrix (ndpe x ndpe)
+%   fr        : Reduced nodal force vector (nfreedof x 1)
+%   ur        : Reduced displacement vector (nfreedof x 1)
+%   Kr        : Reduced stiffness matrix (nfreedof x nfreedof)
 %   E         : Elastic modulus [Pa]
 %   A         : Cross-sectional area [m^2]
 %   I         : 2nd moment of area [m^4]
@@ -109,7 +109,7 @@ while 1
             ELEMENT(end).PROPid = elem_scan(nnpe+1); % PROP ID
         case 'PROP' % Scan material and physical properties
             prop_scan = sscanf(line, '%f')';
-            PROP(end+1).E = prop_scan(1); % Elastic modulus [N/m]
+            PROP(end+1).E = prop_scan(1); % Elastic modulus [Pa]
             PROP(end).A = prop_scan(2); % Cross-sectional area [m^2]
             PROP(end).I = prop_scan(3); % 2nd moment of area [m^4]
         case 'FORCE_NODE' % Scan nodal force data
@@ -336,5 +336,6 @@ xlabel('X [m]')
 ylabel('Y [m]')
 colorbar
 colormap jet
+
 
 fprintf('Done displaying.\n')
