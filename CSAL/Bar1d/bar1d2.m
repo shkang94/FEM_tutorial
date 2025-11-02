@@ -105,7 +105,7 @@ while 1
             ELEMENT(end).PROPid = elem_scan(nnpe+1); % PROP ID
         case 'PROP' % Scan material and physical properties
             prop_scan = sscanf(line, '%f')';
-            PROP(end+1).E = prop_scan(1); % Elastic modulus [N/m]
+            PROP(end+1).E = prop_scan(1); % Elastic modulus [Pa]
             PROP(end).A = prop_scan(2); % Cross-sectional area [m^2]
         case 'FORCE_NODE' % Scan nodal force data
             force_scan = sscanf(line, '%f')';
@@ -229,5 +229,6 @@ colorbar
 
 
 fprintf('Done displaying.\n')
+
 
 
