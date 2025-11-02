@@ -1,0 +1,45 @@
+*NODE
+% xcoord  ycoord
+     0.0     0.0
+     2.0     0.0
+     6.0     0.0
+     0.0     3.0
+     4.0     3.0
+     6.0     3.0
+	 
+*ELEMENT
+%NODEid1 NODEid2 NODEid3  PROPid
+       1       2       4       1
+       4       2       5       1
+       2       3       5       1
+	   5       3       6       1
+
+*PROP
+%      E      nu       t    type
+%                        (1: plane stress, 2: plane strain)
+   1.0e6     0.2     1.0       1
+
+*FORCE_NODE
+% NODEid    xval    yval
+       1     0.0     0.0
+	   
+*FORCE_TRACTION
+%NODEid1 NODEid2    tval    nval
+       3       6  -1.0e1     0.0
+
+*FORCE_BODY
+%NODEid1 NODEid2 NODEid3    xval    yval
+       1       2       4     0.0 -9.81e3
+       4       2       5     0.0 -9.81e3
+       2       3       5     0.0 -9.81e3
+	   5       3       6     0.0 -9.81e3	   
+
+*BC_PRESCRIBED
+% NODEid     val    type 
+%                (1: ux, 2: uy)
+       1     0.0       1
+	   1     0.0       2
+       4     0.0       1
+	   4     0.0       2
+
+*EOF
