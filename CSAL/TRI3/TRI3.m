@@ -33,7 +33,7 @@
 %   nu        : Poisson's ratio
 %   sigx      : Node-wise x-directional normal stress [Pa]
 %   sigy      : Node-wise y-directional normal stress [Pa]
-%   sigz      : Node-wise z-directional normal stress (plain strain) [Pa]
+%   sigz      : Node-wise z-directional normal stress (plane strain) [Pa]
 %   tauxy     : Node-wise xy-directional shear stress [Pa]
 %   sigv      : Node-wise von-Mises stress [Pa]
 %   coord_def : Nodal coordinates of the deformed configuration 
@@ -299,7 +299,7 @@ ux = u(1:2:ndof-1); uy = u(2:2:ndof); % Directional displacement
 % 2-6. Obtain stress
 sigx  = zeros(nnd,1); % x-directional normal stress
 sigy  = zeros(nnd,1); % y-directional normal stress
-sigz  = zeros(nnd,1); % z-directional normal stress (plain strain)
+sigz  = zeros(nnd,1); % z-directional normal stress (plane strain)
 tauxy = zeros(nnd,1); % xy-directional shear stress
 sigv  = zeros(nnd,1); % von-Mises stress
 
@@ -502,3 +502,4 @@ end
 
 
 end
+
