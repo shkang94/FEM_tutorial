@@ -312,8 +312,7 @@ for iel = 1:nel % Loop for each element
     nu   = PROP(PROPid).nu;   % Poisson's ratio of current element
     t    = PROP(PROPid).t;    % Thickness of current element
     type = PROP(PROPid).type; % 2D stress state type of current element
-
-    [A] = Area_TRI3(coorde); % Area of current element;
+    
     [B] = Bmat_TRI3(coorde); % Strain-displacement matrix 
     [C] = Cmat_2D(E, nu, type); % Constitutive matrix
 
@@ -373,7 +372,7 @@ end
 fprintf('- von-Mises stress\n')
 fprintf('   Node ID            Sv\n')
 for ind = 1:nnd
-    fprintf('%10i%14.3e\n',iel,sigv(ind))
+    fprintf('%10i%14.3e\n',ind,sigv(ind))
 end
 
 con = zeros(nel,nnpe); % Elemental connectivity matrix for visualization
@@ -500,5 +499,6 @@ elseif eq(type,2)  % Plane strain
                              nu 1-nu 0
                               0    0 (1-2*nu)/2];
 end
+
 
 end
