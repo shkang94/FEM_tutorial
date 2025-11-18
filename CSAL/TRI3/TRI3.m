@@ -323,12 +323,12 @@ for iel = 1:nel % Loop for each element
     epse = B*ue;   % Elemental strain (epsx, epsy, gammaxy)
     sige = C*epse; % Elemental stress (sigx, sigy, tauxy)
 
-    % Nodal stress averaging
+    % Accumulate stress for nodal averaging
     sigx(cone)  = sigx(cone)  + sige(1);
     sigy(cone)  = sigy(cone)  + sige(2);
     tauxy(cone) = tauxy(cone) + sige(3);
 
-    % Elemental z-directional normal strain for plane strain state
+    % Elemental z-directional normal stress for plane strain state
     if eq(type,2)
         sigze = E*nu/(1+nu)/(1-2*nu)*(epse(1)+epse(2));
         % Nodal stress averaging
@@ -502,4 +502,5 @@ end
 
 
 end
+
 
