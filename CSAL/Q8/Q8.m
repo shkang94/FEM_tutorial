@@ -1,0 +1,716 @@
+%--------------------------------------------------------------------------
+%         FEM 2D 8-Node Quadrilateral (Q8) Element Practice Script
+%--------------------------------------------------------------------------
+% PURPOSE:
+%   To practice the 2D 8-Node Quadrilateral (Q8) finite element.
+%
+% DESCRIPTION:
+%   This script reads the FEM input data from a specified .txt file. It 
+%   then performs finite element analysis based on the 2D Q8 element 
+%   formulation and generates several plots to visualize the results.
+%
+% VARIABLES:
+%   inputname : Name of the .txt file containing the mesh data
+%   uscale    : Displacement scaling parameter for post-processing
+%   ndpnd     : Number of degrees of freedom (DOFs) per node (2)
+%   nnpe      : Number of nodes per element (8 for Q8)
+%   ndpe      : Number of DOFs per element (16 for Q8)
+%   nnpl      : Number of nodes per line (for traction, 3 for Q8)
+%   ndim      : Number of spatial dimensions (2 for Q8)
+%   coord     : Nodal coordinates (nnd x 2) [m]
+%   nnd       : Number of nodes
+%   nel       : Number of elements
+%   ndof      : Number of DOFs
+%   f         : Global force vector (ndof x 1) [N]
+%   u         : Global displacement vector (ndof x 1) [m]
+%   K         : Global stiffness matrix (ndof x ndof) [N/m]
+%   Ke        : Elemental stiffness matrix (ndpe x ndpe) [N/m]
+%   fr        : Reduced nodal force vector (nfreedof x 1) [N]
+%   ur        : Reduced displacement vector (nfreedof x 1) [m]
+%   Kr        : Reduced stiffness matrix (nfreedof x nfreedof) [N/m]
+%   E         : Elastic modulus [Pa]
+%   nu        : Poisson's ratio
+%   sigx      : Node-wise x-directional normal stress [Pa]
+%   sigy      : Node-wise y-directional normal stress [Pa]
+%   sigz      : Node-wise z-directional normal stress (plane strain) [Pa]
+%   tauxy     : Node-wise xy-directional shear stress [Pa]
+%   sigv      : Node-wise von-Mises stress [Pa]
+%   coord_def : Nodal coordinates of the deformed configuration 
+%               (nnd x 2) [m]
+%
+% AUTHOR:
+%   Seung-Hoon Kang
+%
+%--------------------------------------------------------------------------
+
+clear all; close all; clc
+
+inputname = 'Q8_input.txt'; % Input file name
+uscale = 1.0; % Displacement scaling parameter (user-defined)
+ndpnd  = 2; % Number of DOFs per node
+nnpe   = 8; % Number of nodes per element
+nnpl   = 3; % Number of nodes per line
+ndim   = 2; % Number of spatial dimensions
+ndpe   = ndpnd*nnpe; % Number of DOFs per element
+ndpl   = ndpnd*nnpl; % Number of DOFs per line
+
+%% 1. Scan Input
+fprintf('Scanning the input file ...\n')
+
+% 1-1. Initialize variables
+coord          = [];                              % Nodal coordinates [m]
+ELEMENT        = struct('con', {}, 'PROPid', {}); % Element data
+% Property data
+PROP           = struct('E', {}, 'nu', {}, 't', {}, 'type', {});
+FORCE_NODE     = struct('NODEid', {}, 'val', {}); % Nodal force data
+FORCE_TRACTION = struct('con', {}, 'val', {});    % Traction force data
+FORCE_BODY     = struct('con', {}, 'val', {});    % Body force data
+% Prescribed boundary condition data
+BC_PRESCRIBED = struct('NODEid', {}, 'val', {}, 'type', {}); 
+                                                 
+current_section = ''; % To track which part of the file we are in
+
+% 1-2. Open the file
+fid = fopen(inputname, 'r');
+
+while 1
+    % Read one line from the file and remove leading/trailing whitespace
+    line = strtrim(fgetl(fid));
+
+    % Skip empty lines and comment lines
+    if isempty(line) || startsWith(line, '%')
+        continue;
+    end
+
+    % 1-3. Check for section keywords
+    if startsWith(line, '*')
+        % Switch to the new section based on the keyword
+        if strcmpi(line, '*NODE')
+            current_section = 'NODE';
+        elseif strcmpi(line, '*ELEMENT')
+            current_section = 'ELEMENT';
+        elseif strcmpi(line, '*PROP')
+            current_section = 'PROP';
+        elseif strcmpi(line, '*FORCE_NODE')
+            current_section = 'FORCE_NODE';
+        elseif strcmpi(line, '*FORCE_TRACTION')
+            current_section = 'FORCE_TRACTION';
+        elseif strcmpi(line, '*FORCE_BODY')
+            current_section = 'FORCE_BODY';    
+        elseif strcmpi(line, '*BC_PRESCRIBED')
+            current_section = 'BC_PRESCRIBED';
+        elseif strcmpi(line, '*EOF')
+            % Stop reading at the End-Of-File marker
+            break;
+        end
+        % Skip to the next line after processing a keyword
+        continue;
+    end
+
+    % 1-4. Process data based on the current section
+    switch current_section
+        case 'NODE' % Scan nodal coordinates
+            node_scan = sscanf(line, '%f')';
+            coord = [coord; node_scan];
+        case 'ELEMENT' % Scan element information
+            elem_scan = sscanf(line, '%d')';
+            ELEMENT(end+1).con = elem_scan(1:nnpe); % Connectivity
+            ELEMENT(end).PROPid = elem_scan(nnpe+1); % PROP ID
+        case 'PROP' % Scan material and physical properties
+            prop_scan = sscanf(line, '%f')';
+            PROP(end+1).E  = prop_scan(1); % Elastic modulus [Pa]
+            PROP(end).nu   = prop_scan(2); % Poisson's ratio
+            PROP(end).t    = prop_scan(3); % Thickness [m]
+            % Type (1:plane stress, 2:plane strain)
+            PROP(end).type = round(prop_scan(4));
+            if ne(PROP(end).type, 1) && ne(PROP(end).type, 2)
+                error("Invalid type for PROP")
+            end
+        case 'FORCE_NODE' % Scan nodal force data
+            force_scan = sscanf(line, '%f')';
+            FORCE_NODE(end+1).NODEid = round(force_scan(1)); % NODE ID
+            FORCE_NODE(end).val = force_scan(2:3); % Value [N]
+        case 'FORCE_TRACTION' % Scan traction force data
+            force_scan = sscanf(line, '%f')';
+            % Connectivity
+            FORCE_TRACTION(end+1).con = round(force_scan(1:nnpl));
+            FORCE_TRACTION(end).val = force_scan(nnpl+1:nnpl+2); % Value [Pa]
+        case 'FORCE_BODY' % Scan body force data
+            force_scan = sscanf(line, '%f')';
+            % Connectivity
+            FORCE_BODY(end+1).con = round(force_scan(1:nnpe));
+            FORCE_BODY(end).val = force_scan(nnpe+1:nnpe+2); % Value [N/m^3]    
+        case 'BC_PRESCRIBED' % Scan prescribed boundary condition data
+            bc_scan = sscanf(line, '%f')';
+            BC_PRESCRIBED(end+1).NODEid = round(bc_scan(1)); % NODE ID
+            BC_PRESCRIBED(end).val  = bc_scan(2); % Value [m]
+            % Type (1:ux, 2:uy)
+            BC_PRESCRIBED(end).type = round(bc_scan(3)); 
+            if ne(BC_PRESCRIBED(end).type, 1) && ...
+                    ne(BC_PRESCRIBED(end).type, 2)
+                error("Invalid type for BC_PRESCRIBED")
+            end
+    end
+end
+
+nnd  = size(coord,1); % Number of nodes
+nel  = length(ELEMENT); % Number of elements
+ndof = ndpnd*nnd; % Number of total DOFs
+
+for i = 1:length(FORCE_TRACTION)
+    cone = FORCE_TRACTION(i).con; % Connectivity of current line segment
+    found = false; % Flag to check if matching element is found
+    for iel = 1:nel
+        if (all(ismember(cone, ELEMENT(iel).con)))
+            PROPid = ELEMENT(iel).PROPid; % PROP ID of current element
+            t = PROP(PROPid).t; % Thickness of current element
+            FORCE_TRACTION(i).t = t; % Thickness of current line segment
+            found = true;
+            break;
+        end
+    end
+    if ~found
+        error('No matching element found for FORCE_TRACTION on nodes %d-%d-%d', ...
+            cone(1), cone(2), cone(3));
+    end
+end
+
+for i = 1:length(FORCE_BODY)
+    cone = FORCE_BODY(i).con; % Connectivity of current body element
+    found = false; % Flag to check if matching element is found
+    for iel = 1:nel
+        if (all(ismember(cone, ELEMENT(iel).con)))
+            PROPid = ELEMENT(iel).PROPid; % PROP ID of current element
+            t = PROP(PROPid).t; % Thickness of current element
+            FORCE_BODY(i).t = t; % Thickness of current body element
+            found = true;
+            break;
+        end
+    end
+    if ~found
+         error('No matching element found for FORCE_BODY on nodes %d-%d-%d-%d-%d-%d-%d-%d', ...
+             cone(1), cone(2), cone(3), cone(4), cone(5), cone(6), cone(7), cone(8));
+    end
+end
+
+% 1-5. Display the input data (finite element mesh)
+fprintf('Done input scan.\n');
+fprintf('- Number of nodes: %d\n', nnd)
+fprintf('- Number of elements: %d\n', nel)
+fprintf('- Number of total DOFs: %d\n', ndof)
+
+%% 2. Numerical Solver
+fprintf('Performing finite element analysis ...\n')
+% 2-1. Initialize matrices and vectors
+
+K = sparse(ndof,ndof); % Global stiffness matrix (in sparse storage format)
+
+f = zeros(ndof,1); % Global force vector
+for i = 1:length(FORCE_NODE)
+    NODEid = FORCE_NODE(i).NODEid;
+    val = FORCE_NODE(i).val;
+    f(2*NODEid-1) = f(2*NODEid-1) + val(1); % Add nodal force (fx)
+    f(2*NODEid)   = f(2*NODEid)   + val(2); % Add nodal force (fy)
+end
+
+[ngp, xi, wi] = GP_1D3; % Full integration
+for i = 1:length(FORCE_TRACTION)
+    cone = FORCE_TRACTION(i).con; % Connectivity of current line segment
+    val  = FORCE_TRACTION(i).val; % val(1): Tangential traction force (qt)
+                                  % val(2): Normal traction force (qn)
+    t    = FORCE_TRACTION(i).t;   % Thickness of current line segment
+
+    coorde = coord(cone,:);  % Coordinate of current body element
+
+    % Numerical integration
+    fse = zeros(ndpl,1); % Elemental body force vector
+    for igp = 1:ngp
+        [N] = Nmat_B3_2D(xi(igp)); % Shape function matrix
+        % Shape function derivatives with respect to the natural 
+        % coordinates (1 x 3)
+        [dNdxi] = SFD_B3(xi(igp)); 
+        % nvec: Surface tangential vector
+        % tvec: Surface normal vector
+        % detJ: Jacobain determinant
+        [tvec, nvec, detJ] = Jmat_2D_surf(coorde, dNdxi);
+        % Traction force vector (T = tvec*qt + nvec*qn)
+        T = tvec*val(1)+nvec*val(2);
+        fse = fse + N'*T*t*abs(detJ)*wi(igp);
+    end
+
+    % Elemental DOF connectivity
+    conde = [2*cone(1)-1 2*cone(1) 2*cone(2)-1 2*cone(2) 2*cone(3)-1 2*cone(3)];
+    % Add elemental body force vector
+    f(conde) = f(conde) + fse;
+end
+
+% ngp     : Number of Gaussian quadrature points
+% xi, eta : Sets of natural coordinates for Gaussian quadrature (ngp x 1)
+% wi      : Sets of weights for Gaussian quadrature (ngp x 1)
+[ngp, xi, eta, wi] = GP_2D9; % Full integration
+
+for i = 1:length(FORCE_BODY)
+    cone = FORCE_BODY(i).con; % Connectivity of current body element
+    val  = FORCE_BODY(i).val; % val(1): x-directional body force (bx)
+                              % val(2): y-directional body force (by)
+    b    = val';              % Body force vector ([bx; by])                           
+    t    = FORCE_BODY(i).t;   % Thickness of current body element
+
+    coorde = coord(cone,:);  % Coordinate of current body element
+
+    % Numerical integration
+    fbe = zeros(ndpe,1); % Elemental body force vector
+    for igp = 1:ngp
+        [N] = Nmat_Q8(xi(igp),eta(igp)); % Shape function matrix
+        % Shape function derivatives with respect to the natural 
+        % coordinates (2 x 8)
+        [dNdxi] = SFD_Q8(xi(igp), eta(igp)); 
+        % J   : Jacobian matrix (2 x 2)
+        % detJ: Jacobian determinant
+        [J, detJ] = Jmat(coorde, dNdxi);
+        fbe = fbe + N'*b*t*abs(detJ)*wi(igp);
+    end
+
+    % Elemental DOF connectivity
+    conde = [2*cone(1)-1 2*cone(1) 2*cone(2)-1 2*cone(2) ...
+             2*cone(3)-1 2*cone(3) 2*cone(4)-1 2*cone(4) ...
+             2*cone(5)-1 2*cone(5) 2*cone(6)-1 2*cone(6) ...
+             2*cone(7)-1 2*cone(7) 2*cone(8)-1 2*cone(8)];
+    % Add elemental body force vector
+    f(conde) = f(conde) + fbe;
+end
+
+u = zeros(ndof,1); % Global displacement vector
+bcdof = []; % ID set of constrained DOFs
+for i = 1:length(BC_PRESCRIBED)
+    NODEid = BC_PRESCRIBED(i).NODEid;
+    val = BC_PRESCRIBED(i).val;
+    type = BC_PRESCRIBED(i).type;
+    if eq(type,1)     % BC type: ux
+        u(2*NODEid-1) = val; % Assign value of prescribed BC 
+        bcdof(end+1)  = 2*NODEid-1; % Append DOF ID.
+    elseif eq(type,2) % BC type: uy
+        u(2*NODEid)   = val; % Assign value of prescribed BC 
+        bcdof(end+1)  = 2*NODEid;   % Append DOF ID.
+    end
+end
+
+% 2-2. Assemble stiffness matrix
+
+% ngp     : Number of Gaussian quadrature points
+% xi, eta : Sets of natural coordinates for Gaussian quadrature (ngp x 1)
+% wi      : Sets of weights for Gaussian quadrature (ngp x 1)
+[ngp, xi, eta, wi] = GP_2D4; % Reduced integration for stiffness
+
+for iel = 1:nel % Loop for each element
+    cone = ELEMENT(iel).con; % Connectivity of current element
+    coorde = coord(cone,:); % Coordinate of current element
+    PROPid = ELEMENT(iel).PROPid; % PROP ID of current element
+
+    E    = PROP(PROPid).E;    % Elastic modulus of current element
+    nu   = PROP(PROPid).nu;   % Poisson's ratio of current element
+    t    = PROP(PROPid).t;    % Thickness of current element
+    type = PROP(PROPid).type; % 2D stress state type of current element
+
+    [C] = Cmat_2D(E, nu, type); % Constitutive matrix
+
+    % Numerical integration (Reduced integration for stiffness)
+    Ke = zeros(ndpe); % Elemental stiffness matrix
+    for igp = 1:ngp % Loop for each Gaussian quadrature point
+        % Shape function derivatives with respect to the natural 
+        % coordinates (2 x 8)
+        [dNdxi] = SFD_Q8(xi(igp), eta(igp)); 
+        % J   : Jacobian matrix (2 x 2)
+        % detJ: Jacobian determinant
+        [J, detJ] = Jmat(coorde, dNdxi);
+        % Strain-displacement matrix of 8-node quadrilateral (3 x 16)
+        [B] = Bmat_Q8(dNdxi, J);
+        Ke = Ke + B'*C*B*t*abs(detJ)*wi(igp);
+    end
+
+    % Elemental DOF connectivity
+    conde = [2*cone(1)-1 2*cone(1) 2*cone(2)-1 2*cone(2) ...
+             2*cone(3)-1 2*cone(3) 2*cone(4)-1 2*cone(4) ...
+             2*cone(5)-1 2*cone(5) 2*cone(6)-1 2*cone(6) ...
+             2*cone(7)-1 2*cone(7) 2*cone(8)-1 2*cone(8)];
+    % Add elemental stiffness matrix
+    K(conde,conde) = K(conde,conde) + Ke;
+end
+
+% 2-3. Obtain reduced matrices and vector (boundary condition)
+freedof = setdiff(1:ndof, bcdof); % ID set of free DOFs
+Kr = K(freedof,freedof); % Reduced stiffness matrix
+fr = f(freedof) - K(freedof,bcdof)*u(bcdof); % Reduced force vector
+
+% 2-4. Compute reduced displacement vector
+ur = Kr\fr;
+
+% 2-5. Obtain global displacement and force vectors
+u(freedof) = ur;
+f(bcdof) = K(bcdof,:)*u;
+
+fx = f(1:2:ndof-1); fy = f(2:2:ndof); % Directional force
+ux = u(1:2:ndof-1); uy = u(2:2:ndof); % Directional displacement
+
+% 2-6. Obtain stress
+sigx  = zeros(nnd,1); % x-directional normal stress
+sigy  = zeros(nnd,1); % y-directional normal stress
+sigz  = zeros(nnd,1); % z-directional normal stress (plane strain)
+tauxy = zeros(nnd,1); % xy-directional shear stress
+sigv  = zeros(nnd,1); % von-Mises stress
+
+for iel = 1:nel % Loop for each element
+    cone = ELEMENT(iel).con; % Connectivity of current element
+    coorde = coord(cone,:); % Coordinate of current element
+    PROPid = ELEMENT(iel).PROPid; % PROP ID of current element
+
+    E    = PROP(PROPid).E;    % Elastic modulus of current element
+    nu   = PROP(PROPid).nu;   % Poisson's ratio of current element
+    t    = PROP(PROPid).t;    % Thickness of current element
+    type = PROP(PROPid).type; % 2D stress state type of current element
+
+    [C] = Cmat_2D(E, nu, type); % Constitutive matrix
+
+    % Elemental DOF connectivity
+    conde = [2*cone(1)-1 2*cone(1) 2*cone(2)-1 2*cone(2) ...
+             2*cone(3)-1 2*cone(3) 2*cone(4)-1 2*cone(4) ...
+             2*cone(5)-1 2*cone(5) 2*cone(6)-1 2*cone(6) ...
+             2*cone(7)-1 2*cone(7) 2*cone(8)-1 2*cone(8)];
+
+    ue = u(conde); % Elemental displacement
+
+    % Extrapolation from Gauss points to nodes
+    for igp = 1:ngp % Loop for each Gaussian quadrature point
+        % Shape function derivatives with respect to the natural 
+        % coordinates (2 x 8)
+        [dNdxi] = SFD_Q8(xi(igp), eta(igp)); 
+        % J   : Jacobian matrix (2 x 2)
+        % detJ: Jacobian determinant
+        [J, detJ] = Jmat(coorde, dNdxi);
+        % Strain-displacement matrix of 8-node quadrilateral (3 x 16)
+        [B] = Bmat_Q8(dNdxi, J);
+
+        epse = B*ue;   % Elemental strain (epsx, epsy, gammaxy)
+        sige = C*epse; % Elemental stress (sigx, sigy, tauxy)
+
+        % Accumulate stress for nodal averaging
+        [EXPL] = EXPLmat_Q8_2D4(xi(igp), eta(igp)); % Extrapolation matrix
+        sigx(cone)  = sigx(cone)  + EXPL*sige(1);
+        sigy(cone)  = sigy(cone)  + EXPL*sige(2);
+        tauxy(cone) = tauxy(cone) + EXPL*sige(3);
+
+        % Elemental z-directional normal stress for plane strain state
+        if eq(type,2)
+            sigze = E*nu/(1+nu)/(1-2*nu)*(epse(1)+epse(2));
+            % Nodal stress averaging
+            sigz(cone) = sigz(cone) + EXPL*sigze;
+        end
+    end
+end
+
+% Nodal stress averaging
+nepn = zeros(nnd,1); % Number of elements per node
+for iel = 1:nel
+    cone = ELEMENT(iel).con; % Connectivity of current element
+    nepn(cone) = nepn(cone)+1;
+end
+sigx  = sigx./nepn;
+sigy  = sigy./nepn;
+sigz  = sigz./nepn;
+tauxy = tauxy./nepn;
+
+% Compute von-Mises stress
+for ind = 1:nnd
+    sigv(ind) = sqrt(0.5*((sigx(ind)-sigy(ind))^2 ...
+        + (sigy(ind)-sigz(ind))^2 + (sigz(ind)-sigx(ind))^2) ...
+        + 3*tauxy(ind)^2);
+end
+
+fprintf('Done finite element analysis.\n')
+
+%% 3. Display the numerical results
+fprintf('Displaying the numerical results ...\n')
+
+fprintf('- Force\n')
+fprintf('   Node ID            Fx            Fy\n')
+for ind = 1:nnd
+    fprintf('%10i%14.3e%14.3e\n',ind,fx(ind),fy(ind))
+end
+fprintf('- Displacement\n')
+fprintf('   Node ID            Ux            Uy\n')
+for ind = 1:nnd
+    fprintf('%10i%14.3e%14.3e\n',ind,ux(ind),uy(ind))
+end
+fprintf('- von-Mises stress\n')
+fprintf('   Node ID            Sv\n')
+for ind = 1:nnd
+    fprintf('%10i%14.3e\n',ind,sigv(ind))
+end
+
+con = zeros(nel,nnpe); % Elemental connectivity matrix for visualization
+for iel = 1:nel
+    % Assign elemental connectivity
+    con(iel,[1 3 5 7 2 4 6 8]) = ELEMENT(iel).con;
+end
+
+% 3-1. Display the input data (finite element mesh)
+figure(1)
+patch('Faces', con, 'Vertices', coord, 'LineWidth', 0.5, ...
+    'Facecolor', 'c');
+set(gca,'DataAspectRatio',[1 1 1])
+title('FE mesh')
+set(gca, 'Fontsize', 16)
+xlabel('X [m]')
+ylabel('Y [m]')
+
+% 3-2. Display the X-displacement on the deformed configuration
+%   coord_def: Nodal coordinates of the deformed configuration [m]
+coord_def = zeros(nnd, ndim);
+coord_def(:,1) = coord(:,1) + uscale*ux; % x <- x0+ux
+coord_def(:,2) = coord(:,2) + uscale*uy; % y <- x0+uy
+
+figure(2)
+patch('Faces', con, 'Vertices', coord_def, 'FaceVertexCData', ux, ...
+    'Facecolor', 'interp');
+set(gca,'DataAspectRatio',[1 1 1])
+title('X-displacement [m]')
+set(gca, 'Fontsize', 16)
+xlabel('X [m]')
+ylabel('Y [m]')
+colorbar
+colormap jet
+
+% 3-3. Display the Y-displacement on the deformed configuration
+figure(3)
+patch('Faces', con, 'Vertices', coord_def, 'FaceVertexCData', uy, ...
+    'Facecolor', 'interp');
+set(gca,'DataAspectRatio',[1 1 1])
+title('Y-displacement [m]')
+set(gca, 'Fontsize', 16)
+xlabel('X [m]')
+ylabel('Y [m]')
+colorbar
+colormap jet
+
+% 3-4. Display the total displacement on the deformed configuration
+figure(4)
+patch('Faces', con, 'Vertices', coord_def, 'FaceVertexCData', ...
+    sqrt(ux.^2+uy.^2), 'Facecolor', 'interp');
+set(gca,'DataAspectRatio',[1 1 1])
+title('Total displacement [m]')
+set(gca, 'Fontsize', 16)
+xlabel('X [m]')
+ylabel('Y [m]')
+colorbar
+colormap jet
+
+% 3-5. Display the von-Mises stress on the deformed configuration
+figure(5)
+patch('Faces', con, 'Vertices', coord_def, 'FaceVertexCData', sigv, ...
+    'Facecolor', 'interp');
+set(gca,'DataAspectRatio',[1 1 1])
+title('von-Mises stress [Pa]')
+set(gca, 'Fontsize', 16)
+xlabel('X [m]')
+ylabel('Y [m]')
+colorbar
+colormap jet
+
+fprintf('Done displaying.\n')
+
+
+function [ngp, xi, wi] = GP_1D3
+% ngp : Number of Gaussian quadrature points
+% xi  : Sets of natural coordinates for Gaussian quadrature (ngp x 1)
+% wi  : Sets of weights for Gaussian quadrature (ngp x 1)
+
+ngp = 3;
+xi  = [-sqrt(3/5); 0.0; sqrt(3/5)];
+wi  = [ 5/9;       8/9; 5/9];
+
+end
+
+function [ngp, xi, eta, wi] = GP_2D4
+% ngp     : Number of Gaussian quadrature points
+% xi, eta : Sets of natural coordinates for Gaussian quadrature (ngp x 1)
+% wi      : Sets of weights for Gaussian quadrature (ngp x 1)
+
+ngp = 4;
+xi  = [-1/sqrt(3);  1/sqrt(3); -1/sqrt(3);  1/sqrt(3)];
+eta = [-1/sqrt(3); -1/sqrt(3);  1/sqrt(3);  1/sqrt(3)];
+wi  = [1.0; 1.0; 1.0; 1.0];
+
+end
+
+function [ngp, xi, eta, wi] = GP_2D9
+% ngp     : Number of Gaussian quadrature points
+% xi, eta : Sets of natural coordinates for Gaussian quadrature (ngp x 1)
+% wi      : Sets of weights for Gaussian quadrature (ngp x 1)
+
+ngp = 9;
+xi = zeros(ngp,1); eta = zeros(ngp,1); wi = zeros(ngp,1);
+
+xi(1) = -sqrt(3/5); eta(1) = -sqrt(3/5); wi(1) = 25/81;
+xi(2) =  0.0;       eta(2) = -sqrt(3/5); wi(2) = 40/81;
+xi(3) =  sqrt(3/5); eta(3) = -sqrt(3/5); wi(3) = 25/81;
+xi(4) = -sqrt(3/5); eta(4) =  0.0;       wi(4) = 40/81;
+xi(5) =  0.0;       eta(5) =  0.0;       wi(5) = 64/81;
+xi(6) =  sqrt(3/5); eta(6) =  0.0;       wi(6) = 40/81;
+xi(7) = -sqrt(3/5); eta(7) =  sqrt(3/5); wi(7) = 25/81;
+xi(8) =  0.0;       eta(8) =  sqrt(3/5); wi(8) = 40/81;
+xi(9) =  sqrt(3/5); eta(9) =  sqrt(3/5); wi(9) = 25/81;
+
+end
+
+function [N] = Nmat_B3_2D(xi)
+% xi : Natural coordinates
+% N  : Shape function matrix (2 x 6)
+
+N = zeros(2,6);
+
+N(1,1) = 0.5*(xi-1)*xi; % N1
+N(1,3) = 1-xi^2;        % N2
+N(1,5) = 0.5*(xi+1)*xi; % N3
+
+N(2,2:2:6) = N(1,1:2:5); % N(2,2:2:6) <- N1,...,N8
+
+end
+
+function [N] = Nmat_Q8(xi, eta)
+% xi, eta : Natural coordinates
+% N       : Shape function matrix (2 x 16)
+
+N = zeros(2,16);
+
+N( 1, 1) = 0.25*(1-xi)*(1-eta)*(-xi-eta-1); % N1
+N( 1, 3) = 0.25*(1+xi)*(1-eta)*( xi-eta-1); % N2
+N( 1, 5) = 0.25*(1+xi)*(1+eta)*( xi+eta-1); % N3
+N( 1, 7) = 0.25*(1-xi)*(1+eta)*(-xi+eta-1); % N4
+N( 1, 9) = 0.5*(1-xi^2)*(1-eta); % N5
+N( 1,11) = 0.5*(1+xi)*(1-eta^2); % N6
+N( 1,13) = 0.5*(1-xi^2)*(1+eta); % N7
+N( 1,15) = 0.5*(1-xi)*(1-eta^2); % N8
+
+N(2,2:2:16) = N(1,1:2:15); % N(2,2:2:16) <- N1,...,N8
+
+end
+
+function [J, detJ] = Jmat(coorde, dNdxi)
+% coorde  : Nodal coordinate data (nnpel x ndim)
+% dNdxi   : Shape function derivatives with respect to the natural 
+%           coordinates (ndim x nnpel)
+% J       : Jacobian matrix
+% detJ    : Jacobian determinant
+
+J = dNdxi*coorde;
+detJ = det(J);
+
+end
+
+function [tvec, nvec, detJ] = Jmat_2D_surf(coorde, dNdxi)
+% coorde : Nodal coordinate data (nnpel x 2)
+% dNdxi  : Shape function derivatives with respect to the natural 
+%           coordinates (1 x nnpel)
+% nvec   : Surface tangential vector
+% tvec   : Surface normal vector
+% detJ   : Jacobain determinant
+
+lvec = (dNdxi*coorde)';
+detJ = norm(lvec);
+tvec = lvec/detJ;
+nvec = [-tvec(2); tvec(1)];
+
+end
+
+function [dNdxi] = SFD_B3(xi)
+% xi    : Natural coordinates
+% dNdxi : Shape function derivatives with respect to the natural 
+%         coordinates (1 x 3)
+
+dNdxi = zeros(1, 3);
+
+dNdxi(1,1) = 0.5*(2*xi-1); % dN1/dxi
+dNdxi(1,2) =  -2*xi;       % dN2/dxi
+dNdxi(1,3) = 0.5*(2*xi+1); % dN3/dxi
+
+end
+
+function [dNdxi] = SFD_Q8(xi, eta)
+% xi, eta : Natural coordinates
+% dNdxi   : Shape function derivatives with respect to the natural 
+%           coordinates (2 x 8)
+
+dNdxi = zeros(2, 8);
+
+dNdxi(1,1) = 0.25*(1-eta)*(2*xi+eta); % dN1/dxi
+dNdxi(1,2) = 0.25*(1-eta)*(2*xi-eta); % dN2/dxi
+dNdxi(1,3) = 0.25*(1+eta)*(2*xi+eta); % dN3/dxi
+dNdxi(1,4) = 0.25*(1+eta)*(2*xi-eta); % dN4/dxi
+
+dNdxi(1,5) =  -xi*(1-eta);   % dN5/dxi
+dNdxi(1,6) =  0.5*(1-eta^2); % dN6/dxi
+dNdxi(1,7) =  -xi*(1+eta);   % dN7/dxi
+dNdxi(1,8) = -0.5*(1-eta^2); % dN8/dxi
+
+dNdxi(2,1) = 0.25*(1-xi)*(2*eta+xi); % dN1/deta
+dNdxi(2,2) = 0.25*(1+xi)*(2*eta-xi); % dN2/deta
+dNdxi(2,3) = 0.25*(1+xi)*(2*eta+xi); % dN3/deta
+dNdxi(2,4) = 0.25*(1-xi)*(2*eta-xi); % dN4/deta
+
+dNdxi(2,5) = -0.5*(1-xi^2); % dN5/deta
+dNdxi(2,6) = -eta*(1+xi);   % dN6/deta
+dNdxi(2,7) =  0.5*(1-xi^2); % dN7/deta
+dNdxi(2,8) = -eta*(1-xi);   % dN8/deta
+
+end
+
+function [B] = Bmat_Q8(dNdxi, J)
+% dNdxi : Shape function derivatives with respect to the natural 
+%        coordinates (2 x 8)
+% J     : Jacobian matrix
+% B     : Strain-displacement matrix of 8-node quadrilateral (3 x 16)
+
+dNdx = J\dNdxi; % Shape function derivatives with respect to the
+                % global coordinates (2 x 4)
+
+B = zeros(3,16);
+B(1,1:2:15) = dNdx(1,:); % B(1,1:2:15) <- dN1/dx,...,dN8/dx
+B(2,2:2:16) = dNdx(2,:); % B(2,2:2:16) <- dN1/dy,...,dN8/dy
+B(3,1:2:15) = dNdx(2,:); % B(3,1:2:15) <- dN1/dy,...,dN8/dy
+B(3,2:2:16) = dNdx(1,:); % B(3,2:2:16) <- dN1/dx,...,dN8/dx
+
+end
+
+function [C] = Cmat_2D(E, nu, type)
+% E    : Elastic modulus
+% nu   : Poisson's ratio
+% type : 2D stress state type
+% C    : 2D constitutive matrix
+
+if eq(type,1)      % Plane stress
+    C = E/(1-nu^2)*[ 1 nu 0
+                    nu  1 0
+                     0  0 (1-nu)/2];
+elseif eq(type,2)  % Plane strain
+    C = E/(1+nu)/(1-2*nu)*[1-nu   nu 0
+                             nu 1-nu 0
+                              0    0 (1-2*nu)/2];
+end
+
+end
+
+function [EXPL] = EXPLmat_Q8_2D4(xi, eta)
+% xi, eta : Natural coordinates
+% EXPL    : Extrapolation matrix for Q8 element with 2 x 2 integration
+
+EXPL = zeros(8,1);
+
+EXPL(1) = 0.25*(1+1/xi*(-1))*(1+1/eta*(-1)); % Node 1
+EXPL(2) = 0.25*(1+1/xi*( 1))*(1+1/eta*(-1)); % Node 2
+EXPL(3) = 0.25*(1+1/xi*( 1))*(1+1/eta*( 1)); % Node 3
+EXPL(4) = 0.25*(1+1/xi*(-1))*(1+1/eta*( 1)); % Node 4
+EXPL(5) = 0.25*(1+1/xi*( 0))*(1+1/eta*(-1)); % Node 5
+EXPL(6) = 0.25*(1+1/xi*( 1))*(1+1/eta*( 0)); % Node 6
+EXPL(7) = 0.25*(1+1/xi*( 0))*(1+1/eta*( 1)); % Node 7
+EXPL(8) = 0.25*(1+1/xi*(-1))*(1+1/eta*( 0)); % Node 8
+end
